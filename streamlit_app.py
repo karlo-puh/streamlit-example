@@ -3,36 +3,58 @@ import altair as alt
 import math
 import pandas as pd
 import streamlit as st
+from bs4 import BeautifulSoup
+import requests
+import re
+
+
+def wiley_scrape(url):
+    try:
+        page = requests.get(url)
+        page.raise_for_status()
+        soup = BeautifulSoup(page.content, 'html.parser')
+        
+        description = soup.find('div', class_='description')
+        authors = ', '.join(a.text.strip() for a in soup.find_all('a', class_='product-authors'))
+        year, pages = '', ''
+        
+        for p in soup.select('.product-summary p'):
+            if p.text.startswith('ISBN'):
+                isbn = p.find_next_sibling('p').text
+            elif p.text.startswith('Published:'):
+                year = p.find_next_sibling('p').text.split()[-1]
+            elif p.text.startswith('Pages:'):
+                pages = p.find_previous_sibling('p').text.split()[-1]
+        
+        image_url = soup.find('div', class_='item-image').find('img')['src']
+        
+        return {
+            'Image URL': image_url,
+            'Description': description.text.strip(),
+            'Authors': authors,
+            'Year': year,
+            'Pages': pages
+        }
+    except requests.exceptions.RequestException as e:
+        print(f"Error: {e}")
+        return None
 
 """
-# Welcome to Streamlit!
 
-Edit `/streamlit_app.py` to customize this app to your heart's desire :heart:
-
-If you have any questions, checkout our [documentation](https://docs.streamlit.io) and [community
-forums](https://discuss.streamlit.io).
-
-In the meantime, below is an example of what you can do with just a few lines of code:
+# Book Import
 """
 
+link = st.text_input('Zalijepite link knjige', 'https://www...')
 
-with st.echo(code_location='below'):
-    total_points = st.slider("Number of points in spiral", 1, 5000, 2000)
-    num_turns = st.slider("Number of turns in spiral", 1, 100, 9)
+if st.button("Pretraži", type="primary"):
+    st.write('Tražim knjigu na linku', link)
+    scraped_info = wiley_scrape(link)
 
-    Point = namedtuple('Point', 'x y')
-    data = []
+    
 
-    points_per_turn = total_points / num_turns
+if scraped_info:
+    for key, value in scraped_info.items():
+        st.text(f"{key}: {value}")
 
-    for curr_point_num in range(total_points):
-        curr_turn, i = divmod(curr_point_num, points_per_turn)
-        angle = (curr_turn + 1) * 2 * math.pi * i / points_per_turn
-        radius = curr_point_num / total_points
-        x = radius * math.cos(angle)
-        y = radius * math.sin(angle)
-        data.append(Point(x, y))
 
-    st.altair_chart(alt.Chart(pd.DataFrame(data), height=500, width=500)
-        .mark_circle(color='#0068c9', opacity=0.5)
-        .encode(x='x:Q', y='y:Q'))
+
