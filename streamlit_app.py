@@ -1,6 +1,7 @@
 from collections import namedtuple
 import altair as alt
 import math
+import os
 import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
@@ -9,6 +10,7 @@ import time
 
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 st.set_page_config(layout="wide")
+
 
 def wiley_scrape(url):
     try:
@@ -72,6 +74,8 @@ def wiley_scrape(url):
 
 # Book Import
 """
+
+st.text(requests.get("www.strucnaliteratura.hr/wp-json/wc/v3/products/categories?consumer_key=" + str(st.secrets["CK"]) + "&consumer_secret=" + str(st.secrets["CS"])))
 
 
 with st.form("show_book_form"):
