@@ -23,7 +23,6 @@ wcapi = API(
 
 if 'Img Url' not in st.session_state:
     st.session_state['Img Url'] = ''
-                    
  
 if 'Dimensions' not in st.session_state:                   
     st.session_state['Dimensions'] = "20x30"
@@ -94,7 +93,7 @@ def wiley_scrape(url):
 avalible_categories = {}
 
 for page in range(1,3):
-    json_categories = json.loads(wcapi.get("products/categories"), params={"per_page" : 100, "page" : page}).json()
+    json_categories = json.loads(wcapi.get("products/categories", params={'per_page' : 100, 'page' : page}).text)
 
     for category in json_categories:
 
