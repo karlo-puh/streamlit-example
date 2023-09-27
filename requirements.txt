@@ -3,5 +3,4 @@ pandas
 streamlit
 bs4
 requests
-json
 woocommerce
