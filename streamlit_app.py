@@ -17,7 +17,8 @@ wcapi = API(
     url="https://www.strucnaliteratura.hr",
     consumer_key="ck_f2b5bb4942ed9dd74e6a39010ea9e89f94b787e5",
     consumer_secret="cs_d70cd5e633e36012e910dc8a97eb1435325e676f",
-    version="wc/v3"
+    version="wc/v3",
+    timeout=10000
 )
 
 
@@ -131,7 +132,7 @@ if submitted:
     else:
         st.success('Done!')
 
-    st.text(link)
+    #st.text(link)
     st.session_state["ISBN"] = book_data.get('ISBN','');
     st.session_state["Title"] = book_data.get('Title','');
     st.session_state["Subtitle"] = book_data.get('Subtitle',''); 
