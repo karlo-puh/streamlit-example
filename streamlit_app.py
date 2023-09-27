@@ -8,13 +8,25 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import time
+from woocommerce import API
 
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 st.set_page_config(layout="wide")
 
+wcapi = API(
+    url="https://www.strucnaliteratura.hr",
+    consumer_key="ck_f2b5bb4942ed9dd74e6a39010ea9e89f94b787e5",
+    consumer_secret="cs_d70cd5e633e36012e910dc8a97eb1435325e676f",
+    version="wc/v3"
+)
+
 
 if 'Img Url' not in st.session_state:
-    st.session_state['Img Url'] = None
+    st.session_state['Img Url'] = ''
+                    
+ 
+if 'Dimensions' not in st.session_state:                   
+    st.session_state['Dimensions'] = "20x30"
 
 def wiley_scrape(url):
     try:
@@ -81,10 +93,8 @@ def wiley_scrape(url):
 
 avalible_categories = {}
 
-
-
 for page in range(1,3):
-    json_categories = json.loads(requests.get("https://www.strucnaliteratura.hr/wp-json/wc/v3/products/categories?consumer_key=" + st.secrets['ck'] + "&consumer_secret=" + "cs_d70cd5e633e36012e910dc8a97eb1435325e676f&per_page=100&page="+str(page)).text)
+    json_categories = json.loads(wcapi.get("products/categories"), params={"per_page" : 100, "page" : page}).json()
 
     for category in json_categories:
 
@@ -133,6 +143,7 @@ if submitted:
     st.session_state["Price (Euro)"] = book_data.get('Price (Euro)',''); 
     st.session_state["Category"] = book_data.get('Category',''); 
     st.session_state["Description"] = book_data.get('Description',''); 
+    st.session_state['Img Url'] = book_data.get('Image URL', '')
 
 if clear:
     st.session_state["ISBN"] = '';
@@ -169,12 +180,11 @@ with st.form("show_book_form"):
         category = st.text_input('Category', key = 'Category')
         description = st.text_area('Description', height= 400, key = 'Description')   
 
-    if st.session_state['Img Url'] is not None:
+    if st.session_state['Img Url'] != '':
         with col2: 
             st.image(
                 st.session_state['Img Url'],
-                use_column_width=True,
-                key = 'image'
+                use_column_width=True
         )
 
     submited = st.form_submit_button("Submit")
@@ -190,25 +200,132 @@ option = st.selectbox(
 
 if st.button("Import"):
     
+    json_category_list = [{}]
+    category_string = st.session_state['selected_category']
+
+    json_category_list.append({"id" : avalible_categories[category_string]})
+    while category.find('/') > 0:
+        category_string = category_string.rsplit('/',1)[0]
+        json_category_list.append({"id" : avalible_categories[category_string]})
+
+
     data = {
         "name": st.session_state['Title'],
         "type": "simple",
-        "regular_price": st.session_state['Price (Euro)'],
+        "status":"publish",
+        "featured": False,
+        "catalog_visibility":"visible",
         "description": st.session_state['Description'],
-        #"short_description": "Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.",
-        "categories": [
-            {
-                "id": avalible_categories[st.session_state['selected_cateogry']]
-            }
-        ],
+        "short_description": "",
+        "sku": st.session_state['ISBN'],
+        "price": st.session_state['Price (Euro)'],
+        "regular_price": st.session_state['Price (Euro)'],
+
+        
+        #"sale_price":"",
+        #"on_sale" : False,
+
+                
+        "tax_status":"taxable",
+        "tax_class":"5-pdv-a",
+        "manage_stock": False,
+        "backorders":"no",
+        "backorders_allowed":False,
+        "backordered": True,
+
+        
+        #"weight":"",
+        #"dimensions":{
+        #    "length":"",
+        #    "width":"",
+        #    "height":""
+        #},
+
+        "categories": json_category_list,
+
         "images": [
             {
-                "src": st.session_state['Img Url']
+                "src": st.session_state['Img Url'],
+                "name": st.session_state['ISBN'],
+                "alt": st.session_state['ISBN'] + "Book Cover Picture"
             }
-        ]
+        ],
+
+        "attributes":[
+            {
+                "id":7,
+                "name":"autor",
+                "position":1,
+                "visible": True,
+                "variation": False,
+                "options": st.session_state['Authors'].rsplit(', ')
+            },
+            {
+                "id":8,
+                "name":"god. izdanja",
+                "position":2,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    st.session_state['Year']
+                ]
+            },
+            {
+                "id":5,
+                "name":"izdava\u010d",
+                "position":3,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    "Wiley"
+                ]
+            },
+            {
+                "id":6,
+                "name":"jezik",
+                "position":4,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    "English"
+                ]
+            },
+            {
+                "id":1,
+                "name":"uvez",
+                "position":5,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    st.session_state['Format']
+                ]
+            },
+            {
+                "id":12,
+                "name":"ISBN",
+                "position":6,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    st.session_state['ISBN']
+                ]
+            },
+            {
+                "id":20,
+                "name":"dimenzije",
+                "position":7,
+                "visible": True,
+                "variation": False,
+                "options":[
+                    st.session_state['Dimensions']
+                ]
+            }
+        ],
+
     }
 
-    print(requests.post("products", data).json())
+    print(requests.post(("https://www.strucnaliteratura.hr/wp-json/wc/v3/products?consumer_key=" + "ck_f2b5bb4942ed9dd74e6a39010ea9e89f94b787e5" + "&consumer_secret=" + "cs_d70cd5e633e36012e910dc8a97eb1435325e676f"), data).json())
+    st.text_area(data.json())
 
     st.text("Book named " + str( st.session_state['Title'] ) + " was imported to category " + str(st.session_state['selected_category']))
 
