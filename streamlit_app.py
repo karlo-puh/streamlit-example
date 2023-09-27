@@ -323,7 +323,7 @@ if st.button("Import"):
 
     }
 
-    print(requests.post(("https://www.strucnaliteratura.hr/wp-json/wc/v3/products?consumer_key=" + "ck_f2b5bb4942ed9dd74e6a39010ea9e89f94b787e5" + "&consumer_secret=" + "cs_d70cd5e633e36012e910dc8a97eb1435325e676f"), data).json())
+    print(wcapi.post("products", data).json())
     st.text_area(data.json())
 
     st.text("Book named " + str( st.session_state['Title'] ) + " was imported to category " + str(st.session_state['selected_category']))
