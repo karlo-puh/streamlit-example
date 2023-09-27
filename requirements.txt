@@ -3,4 +3,4 @@ pandas
 streamlit
 bs4
 requests
-re
+json

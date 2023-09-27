@@ -6,11 +6,15 @@ import pandas as pd
 import streamlit as st
 from bs4 import BeautifulSoup
 import requests
+import json
 import time
 
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 st.set_page_config(layout="wide")
 
+
+if 'Img Url' not in st.session_state:
+    st.session_state['Img Url'] = None
 
 def wiley_scrape(url):
     try:
@@ -75,62 +79,138 @@ def wiley_scrape(url):
 # Book Import
 """
 
-st.text(requests.get("www.strucnaliteratura.hr/wp-json/wc/v3/products/categories?consumer_key=" + str(st.secrets["CK"]) + "&consumer_secret=" + str(st.secrets["CS"])))
+avalible_categories = {}
 
+
+
+for page in range(1,3):
+    json_categories = json.loads(requests.get("https://www.strucnaliteratura.hr/wp-json/wc/v3/products/categories?consumer_key=" + st.secrets['ck'] + "&consumer_secret=" + "cs_d70cd5e633e36012e910dc8a97eb1435325e676f&per_page=100&page="+str(page)).text)
+
+    for category in json_categories:
+
+        full_path = "";
+
+        i = 0
+        parent_id = category["parent"]
+
+        while parent_id != "" and i < len(json_categories):
+            if json_categories[i]["id"] == parent_id:
+                parent_id = json_categories[i]["parent"]
+                full_path = json_categories[i]["name"] + "/"
+                i = 0
+            else:
+                i+= 1
+            
+        full_path += category["name"]
+        avalible_categories[full_path] = category["id"]
+
+
+link = st.text_input(label = '', label_visibility = 'collapsed')
+
+submitted = st.button("Search")
+
+clear = st.button("Clear Form")
+
+if submitted:
+    book_data = wiley_scrape(link)
+    
+    while book_data is None:
+            st.spinner('Wait for it...')
+    if(book_data.get('Error')):
+        st.warning(book_data.get('Error'))
+        st.stop()
+    else:
+        st.success('Done!')
+
+    st.text(link)
+    st.session_state["ISBN"] = book_data.get('ISBN','');
+    st.session_state["Title"] = book_data.get('Title','');
+    st.session_state["Subtitle"] = book_data.get('Subtitle',''); 
+    st.session_state["Authors"] = book_data.get('Authors',''); 
+    st.session_state["Year"] = book_data.get('Year',''); 
+    st.session_state["Pages"] = book_data.get('Pages',''); 
+    st.session_state["Format"] = book_data.get('Format',''); 
+    st.session_state["Price (Euro)"] = book_data.get('Price (Euro)',''); 
+    st.session_state["Category"] = book_data.get('Category',''); 
+    st.session_state["Description"] = book_data.get('Description',''); 
+
+if clear:
+    st.session_state["ISBN"] = '';
+    st.session_state["Title"] = '';
+    st.session_state["Subtitle"] = ''; 
+    st.session_state["Authors"] = ''; 
+    st.session_state["Year"] = ''; 
+    st.session_state["Pages"] = ''; 
+    st.session_state["Format"] = ''; 
+    st.session_state["Price (Euro)"] = ''; 
+    st.session_state["Category"] = ''; 
+    st.session_state["Description"] = '';
+    st.session_state["selected_category"] = None; 
 
 with st.form("show_book_form"):
-    link = st.text_input('Link', '')
 
-    # Every form must have a submit button.
-    submitted = st.form_submit_button("Submit")
+    col1, col2 = st.columns([4, 2])
+    
+    with col1: 
+        subcol1, subcol2 = st.columns(2)
 
-    if submitted:
+        with subcol1:
+            isbn = st.text_input('ISBN', key = 'ISBN')
+            title = st.text_input('Title', key = 'Title')
+            subtitle = st.text_input('Subtitle', key = 'Subtitle')
+            authors = st.text_input('Authors', key = 'Authors')
 
+        with subcol2:
+            year = st.text_input('Year', key = 'Year')
+            pages = st.text_input('Pages', key = 'Pages')
+            format = st.text_input('Format', key = 'Format')
+            price = st.text_input('Price (Euro)', key = 'Price (Euro)')
 
-        book_data = wiley_scrape(link)
+        category = st.text_input('Category', key = 'Category')
+        description = st.text_area('Description', height= 400, key = 'Description')   
 
-        st.text(link)
-
-
-        col1, col2 = st.columns([4, 2])
-
-
-        
-
-        with col1: 
-            while book_data is None:
-                st.spinner('Wait for it...')
-            if(book_data.get('Error')):
-                st.warning(book_data.get('Error'))
-                st.stop()
-            else:
-                st.success('Done!')
- 
-            subcol1, subcol2 = st.columns(2)
-
-            with subcol1:
-                isbn = st.text_input('ISBN', book_data.get('ISBN',''))
-                title = st.text_input('Title', book_data.get('Title',''))
-                subtitle = st.text_input('Subtitle', book_data.get('Subtitle',''))
-                authors = st.text_input('Authors', book_data.get('Authors',''))
-
-            with subcol2:
-                year = st.text_input('Year', book_data.get('Year',''))
-                pages = st.text_input('Pages', book_data.get('Pages',''))
-                format = st.text_input('Format', book_data.get('Format',''))
-                price = st.text_input('Price (Euro)', book_data.get('Price (Euro)',''))
-
-            category = st.text_input('Category', book_data.get('Category',''))
-            description = st.text_area('Description', book_data.get('Description',''), height= 400)   
-
+    if st.session_state['Img Url'] is not None:
         with col2: 
             st.image(
-                book_data.get('Image URL', ''),
-                use_column_width=True
-            )
+                st.session_state['Img Url'],
+                use_column_width=True,
+                key = 'image'
+        )
+
+    submited = st.form_submit_button("Submit")
 
 
+option = st.selectbox(
+    "Odaberite kategoriju",
+    avalible_categories.keys(),
+    index=None,
+    placeholder="Kategorija...",
+    key = 'selected_category'
+    )
 
+if st.button("Import"):
+    
+    data = {
+        "name": st.session_state['Title'],
+        "type": "simple",
+        "regular_price": st.session_state['Price (Euro)'],
+        "description": st.session_state['Description'],
+        #"short_description": "Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.",
+        "categories": [
+            {
+                "id": avalible_categories[st.session_state['selected_cateogry']]
+            }
+        ],
+        "images": [
+            {
+                "src": st.session_state['Img Url']
+            }
+        ]
+    }
+
+    print(requests.post("products", data).json())
+
+    st.text("Book named " + str( st.session_state['Title'] ) + " was imported to category " + str(st.session_state['selected_category']))
 
 
 
