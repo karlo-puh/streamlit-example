@@ -10,6 +10,13 @@ import json
 import time
 from woocommerce import API
 
+if 'Img Url' not in st.session_state:
+    st.session_state['Img Url'] = 'invalid'
+ 
+if 'Dimensions' not in st.session_state:                   
+    st.session_state['Dimensions'] = "20x30"
+
+
 months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 st.set_page_config(layout="wide")
 
@@ -20,13 +27,6 @@ wcapi = API(
     version="wc/v3",
     timeout=10000
 )
-
-
-if 'Img Url' not in st.session_state:
-    st.session_state['Img Url'] = ''
- 
-if 'Dimensions' not in st.session_state:                   
-    st.session_state['Dimensions'] = "20x30"
 
 def wiley_scrape(url):
     try:
@@ -91,29 +91,33 @@ def wiley_scrape(url):
 # Book Import
 """
 
-avalible_categories = {}
 
-for page in range(1,3):
-    json_categories = json.loads(wcapi.get("products/categories", params={'per_page' : 100, 'page' : page}).text)
+@st.cache_data
+def get_categories():
+    avalible_categories = {}
+    for page in range(1,3):
+        json_categories = json.loads(wcapi.get("products/categories", params={'per_page' : 100, 'page' : page}).text)
 
-    for category in json_categories:
+        for category in json_categories:
 
-        full_path = "";
+            full_path = "";
 
-        i = 0
-        parent_id = category["parent"]
+            i = 0
+            parent_id = category["parent"]
 
-        while parent_id != "" and i < len(json_categories):
-            if json_categories[i]["id"] == parent_id:
-                parent_id = json_categories[i]["parent"]
-                full_path = json_categories[i]["name"] + "/"
-                i = 0
-            else:
-                i+= 1
-            
-        full_path += category["name"]
-        avalible_categories[full_path] = category["id"]
+            while parent_id != "" and i < len(json_categories):
+                if json_categories[i]["id"] == parent_id:
+                    parent_id = json_categories[i]["parent"]
+                    full_path = json_categories[i]["name"] + "/"
+                    i = 0
+                else:
+                    i+= 1
+                
+            full_path += category["name"]
+            avalible_categories[full_path] = category["id"]
+        return avalible_categories
 
+avalible_categories = get_categories()
 
 link = st.text_input(label = '', label_visibility = 'collapsed')
 
@@ -180,7 +184,7 @@ with st.form("show_book_form"):
         category = st.text_input('Category', key = 'Category')
         description = st.text_area('Description', height= 400, key = 'Description')   
 
-    if st.session_state['Img Url'] != '':
+    if st.session_state['Img Url'] != 'invalid':
         with col2: 
             st.image(
                 st.session_state['Img Url'],
