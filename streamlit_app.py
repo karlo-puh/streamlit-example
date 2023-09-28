@@ -9,6 +9,7 @@ import requests
 import json
 import time
 from woocommerce import API
+import psutil
 
 if 'Img Url' not in st.session_state:
     st.session_state['Img Url'] = 'invalid'
@@ -86,6 +87,13 @@ def wiley_scrape(url):
         print(f"Error: {e}")
         return {'Error' : 'Invalid URL'}
 
+
+
+start_memory_usage = psutil.virtual_memory().used
+
+print(f"Memory usage increased by {start_memory_usage / (1024 * 1024):.2f} MB")
+
+
 """
 
 # Book Import
@@ -119,7 +127,7 @@ def get_categories():
 
 avalible_categories = get_categories()
 
-link = st.text_input(label = '', label_visibility = 'collapsed')
+link = st.text_input(label = 'Input URL Here', label_visibility = 'collapsed')
 
 submitted = st.button("Search")
 
