@@ -1,8 +1,10 @@
 from collections import namedtuple
+from typing import Iterable
 import altair as alt
 import math
 import os
 import pandas as pd
+#from scrapy.http import Request
 import streamlit as st
 from bs4 import BeautifulSoup
 import requests
@@ -10,6 +12,45 @@ import json
 import time
 from woocommerce import API
 import psutil
+from bs4 import BeautifulSoup
+import streamlit as st
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.wait import WebDriverWait
+from selenium.webdriver.common.by import By
+
+options = Options()
+options.add_argument("--headless")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-gpu")
+options.add_argument("--disable-features=NetworkService")
+options.add_argument("--window-size=1920x1080")
+options.add_argument("--disable-features=VizDisplayCompositor")
+
+
+def delete_selenium_log():
+    if os.path.exists('selenium.log'):
+        os.remove('selenium.log')
+
+
+def show_selenium_log():
+    if os.path.exists('selenium.log'):
+        with open('selenium.log') as f:
+            content = f.read()
+            st.code(content)
+
+
+def run_selenium():
+    name = str()
+    with webdriver.Chrome(options=options, service_log_path='selenium.log') as driver:
+        url = "https://www.unibet.fr/sport/football/europa-league/europa-league-matchs"
+        driver.get(url)
+        xpath = '//*[@class="ui-mainview-block eventpath-wrapper"]'
+        # Wait for the element to be rendered:
+        element = WebDriverWait(driver, 10).until(lambda x: x.find_elements(by=By.XPATH, value=xpath))
+        name = element[0].get_property('attributes')[0]['name']
+    return name
 
 if 'Img Url' not in st.session_state:
     st.session_state['Img Url'] = 'invalid'
@@ -26,9 +67,83 @@ wcapi = API(
     consumer_key="ck_f2b5bb4942ed9dd74e6a39010ea9e89f94b787e5",
     consumer_secret="cs_d70cd5e633e36012e910dc8a97eb1435325e676f",
     version="wc/v3",
+    wp_api=True,
     timeout=10000
 )
 
+def routledge_scrape(url):
+    try:
+        result = run_selenium()
+        st.info(f'Result -> {result}')
+        st.info('Successful finished. Selenium log file is shown below...')
+        show_selenium_log()
+        #soup = BeautifulSoup(driver.page_source, 'html.parser')
+        #print(soup)
+        #print("not working")
+
+        '''
+        meta_tags = soup.find_all('meta', attrs={'property': True})
+
+        for meta in meta_tags:
+            if meta['property'] == 'product:price:amount':
+                print(meta['content'])
+
+        price = meta_tags.find()
+        
+        # Extracting Title and Subtitle
+        title_with_subtitle = soup.find('h1', class_='visible-xs').text.strip()
+        title_parts = title_with_subtitle.split(':')
+        title = title_parts[0].strip()
+        subtitle = title_parts[1].strip() if len(title_parts) > 1 else None
+
+        # Extracting Authors
+        authors = ', '.join(a.text.strip() for a in soup.find_all('a', class_='product-authors'))
+
+        # Extracting Year, Pages, and ISBN
+        year = None
+        pages = None
+        isbn = None
+        for span in soup.find_all('span'):
+            text = span.text.strip()
+            if text.startswith('ISBN:'):
+                isbn = text.split(': ')[1].replace('-','')
+            elif any(month in text for month in months):
+                year = text.split()[-1]
+            elif text.endswith('Pages'):
+                pages = text.split()[0]
+        
+        # Extracting Description, Format, Image URL, Price (Euro), and Category
+        description = soup.find('section', class_='product-long-description').find('div', class_='description').text.strip()
+
+        format_section = soup.find('div', class_='type-of-book')
+        format = format_section.find('b').text.strip()
+
+        image_url = soup.find('div', class_='item-image').find('img')['data-src']
+
+        price = soup.find('div', class_='product-price-wr').find('p', class_='pr-price').text.strip()
+
+        category_list = soup.find('ul', class_='breadcrumbs')
+        category = '/'.join([li.text.strip() for li in category_list.find_all('li')])
+        
+        return {
+            'Title': title,
+            'Subtitle': subtitle,
+            'Authors': authors,
+            'Year': year,
+            'Pages': pages,
+            'Description': description,
+            'Format': format,
+            'Image URL': 'image_url',
+            'Price (Euro)': price,
+            'ISBN': isbn,
+            'Category': category
+        }
+        '''
+    except requests.exceptions.RequestException as e:
+        print(f"Error: {e}")
+        return {'Error' : 'Invalid URL'}
+
+    
 def wiley_scrape(url):
     try:
         page = requests.get(url)
@@ -134,7 +249,10 @@ submitted = st.button("Search")
 clear = st.button("Clear Form")
 
 if submitted:
-    book_data = wiley_scrape(link)
+    if(link.__contains__('routledge')):
+        book_data = routledge_scrape(link)
+    else:
+        book_data = wiley_scrape(link)
     
     while book_data is None:
             st.spinner('Wait for it...')
@@ -212,20 +330,33 @@ option = st.selectbox(
 
 if st.button("Import"):
     
+    for item in st.session_state:
+        print(str(item) + ":" + str(st.session_state[item]))
+
     json_category_list = [{}]
     category_string = st.session_state['selected_category']
 
     json_category_list.append({"id" : avalible_categories[category_string]})
-    while category.find('/') > 0:
+    while category_string.find('/') > 0:
+        print(category_string)
         category_string = category_string.rsplit('/',1)[0]
         json_category_list.append({"id" : avalible_categories[category_string]})
 
+
+    #wcapi.post("products/attributes/7/terms", data = {"name" = st.session_state['Authors'].rsplit(', ')})
+
+    print(wcapi.post("products/attributes/8/terms", {"name" :  str(st.session_state['Year']) + "."}).json())
+    print(wcapi.post("products/attributes/5/terms", {"name" :  "Wiley"}).json())
+    print(wcapi.post("products/attributes/6/terms", {"name" :  "English"}).json())
+    print(wcapi.post("products/attributes/1/terms", {"name" :  st.session_state['Format']}).json())
+    print(wcapi.post("products/attributes/12/terms", {"name" : st.session_state['ISBN']}).json())
+    print(wcapi.post("products/attributes/7/terms", {"name" : st.session_state['Dimensions']}).json())
 
     data = {
         "name": st.session_state['Title'],
         "type": "simple",
         "status":"publish",
-        "featured": False,
+        "featured": "false",
         "catalog_visibility":"visible",
         "description": st.session_state['Description'],
         "short_description": "",
@@ -233,6 +364,7 @@ if st.button("Import"):
         "price": st.session_state['Price (Euro)'],
         "regular_price": st.session_state['Price (Euro)'],
 
+        "lang":"en",
         
         #"sale_price":"",
         #"on_sale" : False,
@@ -240,10 +372,10 @@ if st.button("Import"):
                 
         "tax_status":"taxable",
         "tax_class":"5-pdv-a",
-        "manage_stock": False,
+        "manage_stock": "false",
         "backorders":"no",
-        "backorders_allowed":False,
-        "backordered": True,
+        "backorders_allowed": "false",
+        "backordered": "true",
 
         
         #"weight":"",
@@ -268,76 +400,77 @@ if st.button("Import"):
                 "id":7,
                 "name":"autor",
                 "position":1,
-                "visible": True,
-                "variation": False,
-                "options": st.session_state['Authors'].rsplit(', ')
+                "visible":"true",
+                "variation":"false",
+                "options":st.session_state['Authors'].rsplit(', ')
             },
             {
                 "id":8,
                 "name":"god. izdanja",
-                "position":2,
-                "visible": True,
-                "variation": False,
+                "visible":"true",
+                "variation":"false",
                 "options":[
-                    st.session_state['Year']
+                    str(st.session_state['Year']) + "."
                 ]
             },
             {
                 "id":5,
-                "name":"izdava\u010d",
+                "name":"izdavač",
                 "position":3,
-                "visible": True,
-                "variation": False,
+                "visible":"true",
+                "variation":"false",
                 "options":[
-                    "Wiley"
+                    str("Wiley")
                 ]
             },
             {
                 "id":6,
                 "name":"jezik",
                 "position":4,
-                "visible": True,
-                "variation": False,
+                "visible":"true",
+                "variation":"false",
                 "options":[
-                    "English"
+                    str("English")
                 ]
             },
             {
                 "id":1,
                 "name":"uvez",
                 "position":5,
-                "visible": True,
-                "variation": False,
+                "visible":"true",
+                "variation":"false",
                 "options":[
-                    st.session_state['Format']
+                    str(st.session_state['Format'])
                 ]
             },
             {
                 "id":12,
                 "name":"ISBN",
                 "position":6,
-                "visible": True,
-                "variation": False,
+                "visible":"true",
+                "variation":"false",
                 "options":[
-                    st.session_state['ISBN']
+                    str(st.session_state['ISBN'])
                 ]
             },
             {
                 "id":20,
                 "name":"dimenzije",
                 "position":7,
-                "visible": True,
-                "variation": False,
-                "options":[
-                    st.session_state['Dimensions']
+                "visible":"true",
+                "variation":"false",
+                "option":[
+                    str(st.session_state['Dimensions'])
                 ]
             }
         ],
 
     }
-
-    print(wcapi.post("products", data).json())
-    st.text_area(data.json())
+    print("\n\n")
+    print(data)
+    #print(wcapi.get("products", params={id : 35433}).json())  
+    #print(wcapi.post("products", data).json())
+    #print(data)
 
     st.text("Book named " + str( st.session_state['Title'] ) + " was imported to category " + str(st.session_state['selected_category']))
 

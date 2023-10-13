@@ -4,3 +4,5 @@ streamlit
 bs4
 requests
 woocommerce
+selenium
+webdriver_manager.chrome
